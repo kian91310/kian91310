@@ -1,0 +1,83 @@
+import os
+import discord
+from discord.ext import commands
+
+# Remplace 'YOUR_BOT_TOKEN' par le token de ton bot
+TOKEN = os.environ['TOKEN_BOT_DISCORD']  # Récupère le token depuis les variables d'environnement
+
+# Configuration des intents
+intents = discord.Intents.default()
+intents.message_content = True
+intents.guilds = True
+intents.members = True  # Nécessaire pour gérer les rôles des membres et vérifier les activités
+
+# Initialisation du bot avec le préfixe '!'
+bot = commands.Bot(command_prefix='!', intents=intents)
+
+@bot.event
+async def on_ready():
+    # Définir une activité pour le bot lorsque le bot est prêt
+    activity = discord.Game(name="Une activité amusante")
+    await bot.change_presence(activity=activity)
+    print(f'Bot connecté en tant que {bot.user}')
+
+@bot.command()
+@commands.has_permissions(manage_roles=True)
+async def mute(ctx, member: discord.Member, *, reason=None):
+    mute_role_name = "Muted"
+
+    # Vérifier si le rôle "Muted" existe, sinon le créer
+    mute_role = discord.utils.get(ctx.guild.roles, name=mute_role_name)
+    if mute_role is None:
+        # Créer le rôle Mute avec les permissions appropriées
+        mute_role = await ctx.guild.create_role(name=mute_role_name)
+
+        # Configurer les permissions pour chaque canal
+        for channel in ctx.guild.channels:
+            await channel.set_permissions(mute_role, send_messages=False, speak=False, add_reactions=False)
+
+    # Attribuer le rôle "Muted" à l'utilisateur
+    await member.add_roles(mute_role, reason=reason)
+    await ctx.send(f"{member.mention} a été réduit au silence pour la raison suivante : {reason}")
+
+@bot.command()
+@commands.has_permissions(manage_roles=True)
+async def unmute(ctx, member: discord.Member):
+    mute_role_name = "Muted"
+    mute_role = discord.utils.get(ctx.guild.roles, name=mute_role_name)
+
+    if mute_role in member.roles:
+        await member.remove_roles(mute_role)
+        await ctx.send(f"{member.mention} a retrouvé la parole.")
+    else:
+        await ctx.send(f"{member.mention} n'était pas muet.")
+
+@bot.command()
+async def ping_valorant(ctx):
+    # Liste des membres jouant à Valorant
+    valorant_players = []
+
+    # Parcourir les membres du serveur
+    for member in ctx.guild.members:
+        # Vérifier si le membre joue à Valorant
+        if member.activities:
+            for activity in member.activities:
+                if isinstance(activity, discord.Game) and activity.name.lower() == "valorant":
+                    valorant_players.append(member.mention)
+
+    if valorant_players:
+        # Mentionner tous les membres qui jouent à Valorant
+        await ctx.send(f"Les joueurs actuellement sur Valorant: {', '.join(valorant_players)}")
+    else:
+        await ctx.send("Personne ne joue à Valorant en ce moment.")
+
+@bot.command()
+async def say(ctx, *, message: str):
+    # Supprimer le message de la commande
+    await ctx.message.delete()
+
+    # Envoyer le message spécifié par l'utilisateur
+    await ctx.send(message)
+
+# Lancer le bot avec le token stocké dans les variables d'environnement
+bot.run(TOKEN)
